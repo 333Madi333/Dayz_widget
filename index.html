@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Агония PVE 1 Online</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one compact card; live count up top, hour-of-day chart below, three facts underneath. */
+:root {
+  --bg: #eef0ec;
+  --card: #fbfbf8;
+  --ink: #1d231f;
+  --ink-2: #4c564f;
+  --muted: #7c867f;
+  --rule: #d9ddd5;
+  --bar: #3f78c0;
+  --bar-dim: #3f78c033;
+  --today: #d9622b;
+  --good: #2f8a4c;
+  --warn: #b7791f;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1113; --card: #14181c; --ink: #e6e9e4; --ink-2: #b2bab3; --muted: #7f8a83; --rule: #262d33;
+  --bar: #5d8fcc; --bar-dim: #5d8fcc33; --today: #d96a2e; --good: #4fbf73; --warn: #e0a640; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0e1113; --card: #14181c; --ink: #e6e9e4; --ink-2: #b2bab3; --muted: #7f8a83; --rule: #262d33;
+  --bar: #5d8fcc; --bar-dim: #5d8fcc33; --today: #d96a2e; --good: #4fbf73; --warn: #e0a640; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { margin: 0; color: var(--ink); font: 14px/1.45 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px; }
+.card { max-width: 760px; margin: 0 auto; background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 20px clamp(16px, 4vw, 28px) 18px; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.ident { min-width: 0; }
+.eyebrow { font: 500 11px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+h1 { font: 700 clamp(28px, 6vw, 38px)/1 var(--font-display); letter-spacing: .01em; margin: 6px 0 0; text-wrap: balance; }
+.addr { font: 400 12px var(--font-mono); color: var(--ink-2); margin-top: 6px; }
+.live { text-align: right; }
+.count { font: 600 clamp(44px, 10vw, 60px)/.9 var(--font-display); font-variant-numeric: tabular-nums; }
+.count small { font-size: .45em; color: var(--muted); font-weight: 500; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--font-body); color: var(--ink-2); margin-top: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill[data-state="live"] .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+.pill[data-state="stale"] .dot { background: var(--warn); }
+.cap { height: 4px; background: var(--rule); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.cap > i { display: block; height: 100%; background: var(--ink-2); border-radius: 2px; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.title { font: 600 15px var(--font-body); }
+.title span { color: var(--muted); font-weight: 400; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 12px var(--font-body); color: var(--ink-2); background: transparent; border: 0; padding: 5px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+.seg button:focus-visible { outline: 2px solid var(--bar); outline-offset: -2px; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+.legend i { display: inline-block; vertical-align: -1px; margin-right: 6px; }
+.legend .sw-bar { width: 10px; height: 10px; border-radius: 2px; background: var(--bar); }
+.legend .sw-line { width: 16px; height: 2px; background: var(--today); vertical-align: 3px; position: relative; }
+.legend .sw-line::after { content: ""; position: absolute; right: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--today); border: 2px solid var(--card); box-sizing: border-box; }
+
+.chart-wrap { position: relative; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis text { font: 400 11px var(--font-mono); fill: var(--muted); font-variant-numeric: tabular-nums; }
+.grid line { stroke: var(--rule); stroke-width: 1; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--card); font: 400 12px/1.4 var(--font-body);
+  padding: 7px 10px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); margin-top: -8px; }
+.tip b { font-family: var(--font-mono); font-weight: 500; }
+.empty { padding: 40px 12px; text-align: center; color: var(--ink-2); border: 1px dashed var(--rule); border-radius: 8px; }
+
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.fact .k { font: 500 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.fact .v { font: 600 24px/1.1 var(--font-display); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.fact .s { font-size: 12px; color: var(--ink-2); }
+footer { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; }
+.badge { font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 2px 6px; }
+@media (max-width: 520px) { .live { text-align: left; } .facts { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: no-preference) { .bar { transition: height .25s, y .25s; } }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <header>
+    <div class="ident">
+      <div class="eyebrow"><span id="map">Chernarus</span><span>DayZ</span><span id="example" class="badge" hidden>Example data</span></div>
+      <h1 id="name">Агония PVE 1</h1>
+      <div class="addr" id="addr">109.248.4.73:2308</div>
+    </div>
+    <div class="live">
+      <div class="count" id="count">–<small> / –</small></div>
+      <div class="pill" id="pill" data-state="none"><span class="dot"></span><span id="status">Loading…</span></div>
+      <div class="cap"><i id="capbar" style="width:0%"></i></div>
+    </div>
+  </header>
+
+  <section style="display:grid;gap:10px">
+    <div class="toolbar">
+      <div class="title">Players by time of day <span id="tzlabel"></span></div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Average over">
+          <button id="r7" data-range="7" aria-pressed="true">7 days</button>
+          <button id="r30" data-range="30" aria-pressed="false">30 days</button>
+        </div>
+        <div class="seg" role="group" aria-label="Time zone">
+          <button id="tzLocal" data-tz="local" aria-pressed="true">My time</button>
+          <button id="tzMsk" data-tz="msk" aria-pressed="false">MSK</button>
+        </div>
+      </div>
+    </div>
+    <div class="legend"><span><i class="sw-bar"></i><span id="lgAvg">Average, last 7 days</span></span><span><i class="sw-line"></i>Today</span></div>
+    <div class="chart-wrap" id="wrap">
+      <svg id="chart" viewBox="0 0 720 260" role="img" aria-label="Average online players for each hour of the day"></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+  </section>
+
+  <section class="facts">
+    <div class="fact"><div class="k">Busiest hour</div><div class="v" id="fBusy">–</div><div class="s" id="fBusyS"></div></div>
+    <div class="fact"><div class="k">Quietest hour</div><div class="v" id="fQuiet">–</div><div class="s" id="fQuietS"></div></div>
+    <div class="fact"><div class="k">Today's peak</div><div class="v" id="fPeak">–</div><div class="s" id="fPeakS"></div></div>
+  </section>
+
+  <footer><span id="src">Source: DZSA Launcher, checked every 10 minutes</span><span id="span"></span></footer>
+</main>
+
+<script>
+(() => {
+  const DATA_URL = "data/history.json";
+  const REFRESH_MS = 5 * 60 * 1000;
+  const MSK = 3 * 3600; // Moscow is UTC+3 all year
+  const $ = id => document.getElementById(id);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  let data = null, range = +(store.get("range") || 7), tz = store.get("tz") || "local";
+
+  const offsetSec = t => tz === "msk" ? MSK : -new Date(t * 1000).getTimezoneOffset() * 60;
+  const hourOf = t => (((t + offsetSec(t)) % 86400) + 86400) % 86400 / 3600; // fractional hour 0..24
+  const dayOf = t => Math.floor((t + offsetSec(t)) / 86400);
+  const hh = h => String(Math.floor(h) % 24).padStart(2, "0") + ":00";
+  const ago = s => s < 90 ? "just now" : s < 3600 ? Math.round(s / 60) + " min ago" : s < 86400 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " d ago";
+
+  function setPressed() {
+    for (const b of document.querySelectorAll("[data-range]")) b.setAttribute("aria-pressed", +b.dataset.range === range);
+    for (const b of document.querySelectorAll("[data-tz]")) b.setAttribute("aria-pressed", b.dataset.tz === tz);
+    $("lgAvg").textContent = `Average, last ${range} days`;
+    const off = tz === "msk" ? 3 : -new Date().getTimezoneOffset() / 60;
+    $("tzlabel").textContent = `(UTC${off >= 0 ? "+" : "−"}${Math.abs(off)})`;
+  }
+  document.querySelectorAll("[data-range]").forEach(b => b.onclick = () => { range = +b.dataset.range; store.set("range", range); render(); });
+  document.querySelectorAll("[data-tz]").forEach(b => b.onclick = () => { tz = b.dataset.tz; store.set("tz", tz); render(); });
+
+  function stats() {
+    const pts = data.points, now = Date.now() / 1000;
+    const today = dayOf(now);
+    const sum = Array(24).fill(0), n = Array(24).fill(0), max = Array(24).fill(0);
+    const todayPts = [], tSum = Array(24).fill(0), tN = Array(24).fill(0);
+    for (const [t, p] of pts) {
+      const h = Math.floor(hourOf(t));
+      if (dayOf(t) === today) { todayPts.push([hourOf(t), p, t]); tSum[h] += p; tN[h]++; continue; }
+      if (t < now - range * 86400) continue;
+      sum[h] += p; n[h]++; max[h] = Math.max(max[h], p);
+    }
+    return { avg: sum.map((s, i) => n[i] ? s / n[i] : null), max, n, todayPts, todayAvg: tSum.map((s, i) => tN[i] ? s / tN[i] : null) };
+  }
+
+  function render() {
+    setPressed();
+    if (!data) return;
+    const s = data.server || {}, pts = data.points || [];
+    $("example").hidden = !data.isExample;
+    if (s.name) $("name").textContent = s.name;
+    if (s.map) $("map").textContent = s.map.replace(/plus$/i, "").replace(/^./, c => c.toUpperCase());
+    if (s.ip) $("addr").textContent = `${s.ip}:${s.gamePort || ""}`;
+    const last = pts[pts.length - 1], maxP = s.maxPlayers || 50;
+    const now = Date.now() / 1000;
+    if (last) {
+      $("count").innerHTML = `${last[1]}<small> / ${maxP}</small>`;
+      $("capbar").style.width = Math.min(100, last[1] / maxP * 100) + "%";
+      const age = now - last[0], fresh = age < 30 * 60;
+      $("pill").dataset.state = fresh ? "live" : "stale";
+      $("status").textContent = (fresh ? "Online now · " : "No new reading · ") + ago(age);
+    } else {
+      $("pill").dataset.state = "none"; $("status").textContent = "Waiting for the first reading";
+    }
+    $("span").textContent = pts.length ? `${pts.length.toLocaleString()} readings since ${new Date(pts[0][0] * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : "";
+    drawChart(stats(), maxP);
+  }
+
+  function drawChart(st, maxP) {
+    const svg = $("chart"), W = Math.max(300, Math.round($("wrap").clientWidth || 720)), H = W < 500 ? 220 : 260, L = 30, R = 6, T = 10, B = 26;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const pw = W - L - R, ph = H - T - B, slot = pw / 24;
+    const hasAny = st.avg.some(v => v != null) || st.todayPts.length;
+    if (!hasAny) {
+      svg.innerHTML = "";
+      $("wrap").querySelector(".empty")?.remove();
+      $("wrap").insertAdjacentHTML("beforeend", `<div class="empty">No readings yet. The first point appears within 10 minutes of the collector starting, and the hourly averages fill in over the next day.</div>`);
+      svg.style.display = "none"; setFacts(st); return;
+    }
+    $("wrap").querySelector(".empty")?.remove(); svg.style.display = "";
+    const top = Math.max(10, Math.ceil(Math.max(...st.avg.filter(v => v != null), ...st.todayPts.map(p => p[1]), 1) / 10) * 10);
+    const yMax = Math.min(top, Math.max(maxP, top));
+    const y = v => T + ph - v / yMax * ph;
+    let g = `<g class="grid">`;
+    for (let v = 0; v <= yMax; v += yMax > 30 ? 10 : 5) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
+    g += `</g><g class="axis">`;
+    for (let v = 0; v <= yMax; v += yMax > 30 ? 10 : 5) g += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    for (let h = 0; h < 24; h += W < 500 ? 6 : 3) g += `<text x="${L + h * slot + slot / 2}" y="${H - 6}" text-anchor="middle">${hh(h).slice(0, 2)}</text>`;
+    g += `</g>`;
+    const curH = Math.floor(hourOf(Date.now() / 1000));
+    g += `<rect x="${L + curH * slot}" y="${T}" width="${slot}" height="${ph}" fill="var(--bar-dim)" opacity=".45"/>`;
+    // bars: 4px rounded top, anchored to baseline
+    const bw = slot - 4;
+    st.avg.forEach((v, h) => {
+      if (v == null || v <= 0) return;
+      const x = L + h * slot + 2, yy = y(v), hgt = T + ph - yy, r = Math.min(4, hgt, bw / 2);
+      g += `<path class="bar" fill="var(--bar)" d="M${x},${T + ph}V${yy + r}Q${x},${yy} ${x + r},${yy}H${x + bw - r}Q${x + bw},${yy} ${x + bw},${yy + r}V${T + ph}Z"/>`;
+    });
+    // today line
+    if (st.todayPts.length) {
+      const tp = st.todayPts.map(([h, p]) => [L + h * pw / 24, y(p)]);
+      g += `<polyline fill="none" stroke="var(--card)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" points="${tp.map(p => p.join(",")).join(" ")}"/>`;
+      g += `<polyline fill="none" stroke="var(--today)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${tp.map(p => p.join(",")).join(" ")}"/>`;
+      const [lx, ly] = tp[tp.length - 1];
+      g += `<circle cx="${lx}" cy="${ly}" r="5" fill="var(--today)" stroke="var(--card)" stroke-width="2"/>`;
+    }
+    g += `<line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="var(--ink-2)" stroke-width="1"/>`;
+    for (let h = 0; h < 24; h++) g += `<rect data-h="${h}" x="${L + h * slot}" y="${T}" width="${slot}" height="${ph + B}" fill="transparent"/>`;
+    svg.innerHTML = g;
+    const tip = $("tip");
+    svg.querySelectorAll("[data-h]").forEach(el => {
+      const show = () => {
+        const h = +el.dataset.h, a = st.avg[h], t = st.todayAvg[h];
+        const box = svg.getBoundingClientRect(), k = box.width / W;
+        tip.innerHTML = `<b>${hh(h)}–${hh(h + 1)}</b><br>Average: <b>${a == null ? "–" : a.toFixed(1)}</b>${st.max[h] ? ` · peak ${st.max[h]}` : ""}<br>Today: <b>${t == null ? "–" : Math.round(t)}</b>`;
+        tip.style.left = Math.min(box.width - 70, Math.max(70, (L + h * slot + slot / 2) * k)) + "px";
+        tip.style.top = (a != null ? y(Math.max(a, t || 0)) : T + ph / 2) * k + "px";
+        tip.hidden = false;
+      };
+      el.addEventListener("pointerenter", show); el.addEventListener("click", show);
+      el.addEventListener("pointerleave", () => tip.hidden = true);
+    });
+    setFacts(st);
+  }
+
+  function setFacts(st) {
+    const idx = st.avg.map((v, i) => [v, i]).filter(x => x[0] != null);
+    if (idx.length) {
+      const busy = idx.reduce((a, b) => b[0] > a[0] ? b : a), quiet = idx.reduce((a, b) => b[0] < a[0] ? b : a);
+      $("fBusy").textContent = hh(busy[1]); $("fBusyS").textContent = `${busy[0].toFixed(1)} players on average`;
+      $("fQuiet").textContent = hh(quiet[1]); $("fQuietS").textContent = `${quiet[0].toFixed(1)} players on average`;
+    } else { $("fBusy").textContent = $("fQuiet").textContent = "–"; $("fBusyS").textContent = $("fQuietS").textContent = "Needs a day of readings"; }
+    if (st.todayPts.length) {
+      const pk = st.todayPts.reduce((a, b) => b[1] > a[1] ? b : a);
+      $("fPeak").textContent = pk[1]; $("fPeakS").textContent = `at ${String(Math.floor(pk[0])).padStart(2, "0")}:${String(Math.floor(pk[0] % 1 * 60)).padStart(2, "0")}`;
+    } else { $("fPeak").textContent = "–"; $("fPeakS").textContent = "No readings today yet"; }
+  }
+
+  async function load() {
+    try {
+      const r = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      data = await r.json(); data.points = data.points || [];
+    } catch (e) {
+      if (!data) { $("status").textContent = "Could not load player history"; }
+    }
+    render();
+  }
+  setPressed(); load(); setInterval(load, REFRESH_MS);
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+})();
+</script>
+</body>
+</html>
