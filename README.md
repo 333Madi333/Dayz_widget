@@ -22,19 +22,13 @@ check it regularly and keep the history. This setup uses GitHub for both, for fr
    - the busiest hour, the quietest hour and today's peak
    - a switch between your own time zone and Moscow time
 
-## Setup (about 5 minutes)
+## Setup
 
-1. Create a new **public** repository on GitHub, for example `dayz-online`.
-2. Upload everything in this folder, including the hidden `.github` folder.
-   (On the GitHub website: Add file → Upload files, then drag the folder contents in.
-   If the `.github` folder doesn't upload, create the file
-   `.github/workflows/collect.yml` by hand with Add file → Create new file and paste it.)
-3. **Settings → Actions → General → Workflow permissions**: choose
-   *Read and write permissions* and save.
-4. **Actions** tab → *Record player count* → **Run workflow** once, to check it works.
-   `data/history.json` should get its first point.
-5. **Settings → Pages**: Source *Deploy from a branch*, branch `main`, folder `/ (root)`.
-   After a minute the widget is live at `https://<your-username>.github.io/<repo>/`.
+The collector is already running: the files are pushed and the first reading is in
+`data/history.json`. The one remaining step is turning on the web page:
+
+**Settings → Pages**: Source *Deploy from a branch*, branch `main`, folder `/ (root)`, Save.
+After a minute the widget is live at `https://333madi333.github.io/dayz_widget/`.
 
 The hour averages fill in over the first day and become reliable after about a week.
 
